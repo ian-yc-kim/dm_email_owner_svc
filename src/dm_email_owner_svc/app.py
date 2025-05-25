@@ -62,7 +62,8 @@ def reset_rate_limiter_state() -> None:
 async def rate_limit_middleware(request: Request, call_next):
     # Capture the fake (or real) time.time from global module
     fake_time = time.time
-    client_id = request.client.host
+    # Allow override via header for testing multiple client isolation
+    client_id = request.headers.get("X-Client-Host", request.client.host)
     try:
         # Perform rate limiting under the monkeypatched time
         allowed = limiter.is_allowed(client_id)

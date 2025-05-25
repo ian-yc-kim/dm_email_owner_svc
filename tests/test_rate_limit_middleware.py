@@ -43,3 +43,23 @@ def test_rate_limit_window_rollover(monkeypatch, client):
     resp = client.get("/ping")
     assert resp.status_code == 200
     assert resp.json() == {"ping": "pong"}
+
+
+def test_rate_limit_multiple_client_isolation(monkeypatch, client):
+    # Freeze time to ensure same window for all clients
+    fixed_time = 2000.0
+    DummyTime = type("DummyTime", (), {"time": staticmethod(lambda: fixed_time)})
+    monkeypatch.setattr(rate_limit, "time", DummyTime)
+    # Client A: exceed limit
+    for _ in range(10):
+        resp_a = client.get("/ping", headers={"X-Client-Host": "1.2.3.4"})
+        assert resp_a.status_code == 200
+        assert resp_a.json() == {"ping": "pong"}
+    # 11th for Client A should be rate-limited
+    resp_a11 = client.get("/ping", headers={"X-Client-Host": "1.2.3.4"})
+    assert resp_a11.status_code == 429
+    assert resp_a11.json() == {"detail": "Rate limit exceeded. Max 10 requests per minute."}
+    # Client B: independent counter, first request should succeed
+    resp_b = client.get("/ping", headers={"X-Client-Host": "5.6.7.8"})
+    assert resp_b.status_code == 200
+    assert resp_b.json() == {"ping": "pong"}
