@@ -39,3 +39,31 @@ curl -X GET http://localhost:8000/health
   "status": "ok"
 }
 ```
+
+## OpenAI Client Configuration
+
+Configure the OpenAI client by setting the following environment variables:
+
+- **OPENAI_API_KEY**: (required) Your OpenAI API key.
+- **OPENAI_MODEL_NAME**: (optional) Model name to use (default: `gpt-4o-mini`).
+- **OPENAI_TIMEOUT**: (optional) Request timeout in seconds (default: `30`).
+- **OPENAI_MAX_RETRIES**: (optional) Number of retry attempts on failure (default: `3`).
+
+## Usage Example
+
+Below is an example of injecting the OpenAI client into a FastAPI route using dependency injection:
+
+```python
+from fastapi import Depends, FastAPI
+from dm_email_owner_svc.core.openai_client import OpenAIClient, get_openai_client
+
+app = FastAPI()
+
+@app.post("/chat")
+async def chat_endpoint(
+    messages: list[dict],
+    client: OpenAIClient = Depends(get_openai_client)
+):
+    result = client.chat_completion(messages)
+    return result
+```
