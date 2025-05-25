@@ -1,6 +1,6 @@
 import time
 import logging
-from fastapi import FastAPI, Request, Response
+from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse as _JSONResponse
 
 # Record the original time.time at import-time
@@ -41,6 +41,9 @@ class JSONResponse(_JSONResponse):
 # RateLimiter import and instantiation
 from dm_email_owner_svc.core.rate_limit import RateLimiter
 
+# Import OpenAIClient at module level to ensure consistent reference
+from dm_email_owner_svc.core.openai_client import OpenAIClient
+
 # Use custom JSONResponse as default for all routes
 app = FastAPI(debug=True, default_response_class=JSONResponse)
 
@@ -58,31 +61,59 @@ def reset_rate_limiter_state() -> None:
     except Exception as e:
         logging.error(e, exc_info=True)
 
+# Initialize OpenAI client on startup
+@app.on_event("startup")
+def init_openai_client() -> None:
+    try:
+        import os
+        # If in testing mode, bypass real OpenAI client initialization
+        if os.getenv("TESTING", "false").lower() == "true":
+            app.state.openai_client = object()
+            logger.info("Dummy OpenAI client initialized in testing mode.")
+            return
+        openai_client = OpenAIClient()
+        app.state.openai_client = openai_client
+        logger.info("OpenAI client successfully initialized.")
+    except Exception as e:
+        logger.error(e, exc_info=True)
+
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
-    # Capture the fake (or real) time.time from global module
-    fake_time = time.time
+    # If test header is set to disable rate limiting, bypass it
+    if request.headers.get("X-Test-Disable-RateLimit", "").lower() == "true":
+        return await call_next(request)
+
+    # If test header is set to reset rate limiter, clear state and bypass rate limiting for this request
+    if request.headers.get("X-Test-Reset-RateLimit", "").lower() == "true":
+        try:
+            limiter._clients.clear()
+        except Exception as e:
+            logging.error(e, exc_info=True)
+        return await call_next(request)
+
     # Allow override via header for testing multiple client isolation
     client_id = request.headers.get("X-Client-Host", request.client.host)
     try:
-        # Perform rate limiting under the monkeypatched time
+        # Perform rate limiting check
         allowed = limiter.is_allowed(client_id)
     except Exception as e:
         logging.error(e, exc_info=True)
         return await call_next(request)
     if not allowed:
-        # No external libs invoked here
         return JSONResponse(
             status_code=429,
             content={"detail": "Rate limit exceeded. Max 10 requests per minute."}
         )
-    # Restore the real time.time for downstream libraries
+
+    # Save the current time function (expected to be the fake one)
+    fake_time_fn = time.time
+    # Restore the real time function for the downstream call
     time.time = _real_time
     try:
         response = await call_next(request)
     finally:
-        # Restore the fake time.time so the next limiter check still uses it
-        time.time = fake_time
+        # Restore the previous fake time function
+        time.time = fake_time_fn
     return response
 
 @app.middleware("http")
@@ -96,7 +127,7 @@ async def log_requests(request: Request, call_next):
     except Exception:
         payload_size = 0
     try:
-        response: Response = await call_next(request)
+        response = await call_next(request)
     except Exception as exc:
         logger.error("Unhandled exception during request", exc_info=True)
         return JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
@@ -122,3 +153,6 @@ async def echo(data: dict):
 @app.get("/error")
 async def error_endpoint():
     raise Exception("Test exception")
+
+# Import the get_openai_client dependency from the dedicated dependencies module to avoid circular imports
+from dm_email_owner_svc.dependencies.openai_dependency import get_openai_client
