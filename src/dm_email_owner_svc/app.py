@@ -140,7 +140,10 @@ async def log_requests(request: Request, call_next):
 
 # include routers
 from dm_email_owner_svc.routers.health import health_router
+from dm_email_owner_svc.routers.parse import parse_router
+
 app.include_router(health_router)
+app.include_router(parse_router)
 
 @app.get("/ping")
 async def ping():
