@@ -17,6 +17,7 @@ uvicorn = "^0.32.1"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.3"
+httpx = "^0.28.1"
 
 [tool.poetry.scripts]
 dm_email_owner_svc = "dm_email_owner_svc.main:main"

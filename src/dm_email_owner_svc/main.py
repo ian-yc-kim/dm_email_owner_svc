@@ -1,20 +1,15 @@
-import logging
-
 import uvicorn
 from dm_email_owner_svc.app import app
 from dm_email_owner_svc.config import SERVICE_PORT
-
-
-# Set up logging for the application
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+from dm_email_owner_svc.core.logging import configure_logging
 
 
 def main():
+    # Configure non-blocking logging before starting the server
+    configure_logging()
     service_port = int(SERVICE_PORT)
     uvicorn.run(app, host="0.0.0.0", port=service_port)
 
 
 if __name__ == "__main__":
-    # Entry point for the application
     main()
