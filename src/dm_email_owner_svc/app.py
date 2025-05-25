@@ -33,6 +33,8 @@ async def log_requests(request: Request, call_next):
     return response
 
 # add routers
+from dm_email_owner_svc.routers.health import health_router
+app.include_router(health_router)
 
 # Test endpoints for middleware verification
 @app.get("/ping")
