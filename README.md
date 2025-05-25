@@ -67,3 +67,32 @@ async def chat_endpoint(
     result = client.chat_completion(messages)
     return result
 ```
+
+### Parse Endpoint
+
+- **HTTP Method and URL**: `POST /parse`
+- **Request Body Schema**:
+  ```json
+  {
+    "html_content": "<div>John Doe <john@example.com></div>",
+    "emails": ["john@example.com"]
+  }
+  ```
+- **Example Request**:
+  ```bash
+  curl -X POST http://localhost:8000/parse \
+       -H 'Content-Type: application/json' \
+       -d '{
+         "html_content": "<div>John Doe <john@example.com></div>",
+         "emails": ["john@example.com"]
+       }'
+  ```
+- **Example Successful Response** (HTTP 200):
+  ```json
+  [
+    {"email": "john@example.com", "owner": "John Doe"}
+  ]
+  ```
+- **Error Responses**:
+  - **422 Unprocessable Entity**: Validation error for malformed request payload.
+  - **502 Bad Gateway**: Downstream API failure or response parsing error.
